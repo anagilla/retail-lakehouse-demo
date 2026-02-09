@@ -2,36 +2,35 @@
 
 ## v1.0.0 — 2026-02-09
 
-Initial release of the Retail Lakehouse Demo.
+First version with full Medallion pipeline, ML models, and AI/BI integration.
 
 ### Data platform
 - TPC-H data generation (pure PySpark, serverless-compatible)
-- Full Medallion Architecture: Bronze → Silver → Gold
-- 12 analytical SQL queries on Gold layer tables
+- Medallion Architecture: Bronze, Silver, Gold
+- 12 analytical SQL queries on Gold tables
 - Liquid clustering on high-volume tables
-- Data quality constraints (CHECK) on Silver layer
+- Data quality constraints on Silver layer
 
-### Machine Learning
+### Machine learning
 - Customer churn prediction (scikit-learn GradientBoosting)
 - Demand forecasting by region (Prophet)
-- MLflow experiment tracking and Unity Catalog model registry
+- MLflow experiment tracking, Unity Catalog model registry
 
 ### Online serving
-- Lakebase (PostgreSQL) integration for low-latency lookups
-- Feature Store registration for ML features
+- Lakebase (PostgreSQL) for low-latency lookups
+- Feature Store registration
 - Vector Search index for product catalog
 
-### AI / BI
+### AI and BI
 - AI Agent with 6 Unity Catalog SQL tool functions
-- Foundation Model API integration (Llama 3.3 70B)
-- AI/BI Lakeview Dashboard (programmatic creation)
+- Foundation Model API (Llama 3.3 70B) with tool-calling
+- Lakeview Dashboard (programmatic)
 - Genie Space configuration for self-serve analytics
 
 ### Application
-- Gradio-based Databricks App with 4 interactive tabs
+- Gradio-based Databricks App (4 tabs)
 - REST API deployment automation
 
-### DevOps
-- Databricks Asset Bundle configuration
+### Infrastructure
+- Databricks Asset Bundle config
 - Multi-target support (dev / staging / prod)
-- Structured project layout

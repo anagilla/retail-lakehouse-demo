@@ -3,4 +3,6 @@ command:
   - app.py
 env:
   - name: CATALOG
-    description: Unity Catalog catalog name for the retail data
+    description: Unity Catalog catalog name
+  - name: DATABRICKS_WAREHOUSE_ID
+    description: SQL Warehouse ID for query execution

@@ -1,11 +1,8 @@
 -- ============================================================================
--- Gold Layer Analytics Queries — Retail Demo
+-- Gold Layer Analytics — Retail Demo
 -- ============================================================================
--- Run these in Databricks SQL Editor, a SQL Warehouse, or a notebook with %sql.
--- All queries target the retail_gold schema in the current catalog.
---
--- These queries are designed to showcase Databricks SQL capabilities for a
--- retail customer evaluation: window functions, CTEs, percentiles, pivots.
+-- Run in the SQL Editor, against a SQL Warehouse, or via %sql in a notebook.
+-- All queries target the retail_gold schema.
 -- ============================================================================
 
 USE CATALOG ${catalog};  -- parameterize: e.g. SET catalog = 'main';
@@ -13,7 +10,7 @@ USE SCHEMA retail_gold;
 
 -- ============================================================================
 -- Q1: Revenue Trend — Monthly revenue with YoY comparison
--- Use case: CFO monthly business review
+-- CFO monthly review
 -- ============================================================================
 SELECT
     year_month,
@@ -34,7 +31,7 @@ ORDER BY region, year_month;
 
 -- ============================================================================
 -- Q2: Top 20 Customers by Lifetime Value
--- Use case: VIP program, account management
+-- VIP program / account management
 -- ============================================================================
 SELECT
     customer_key,
@@ -53,8 +50,8 @@ ORDER BY monetary DESC
 LIMIT 20;
 
 -- ============================================================================
--- Q3: Customer Segment Distribution — How healthy is our customer base?
--- Use case: Marketing strategy, retention planning
+-- Q3: Customer Segment Distribution
+-- Marketing / retention planning
 -- ============================================================================
 SELECT
     rfm_segment,
@@ -69,8 +66,8 @@ GROUP BY rfm_segment
 ORDER BY total_revenue DESC;
 
 -- ============================================================================
--- Q4: Regional Revenue Heatmap — Quarterly revenue by region
--- Use case: Regional P&L, expansion planning
+-- Q4: Regional Revenue — Quarterly by region (pivot)
+-- Regional P&L / expansion planning
 -- ============================================================================
 WITH quarterly AS (
     SELECT
@@ -90,8 +87,7 @@ ORDER BY year_quarter;
 
 -- ============================================================================
 -- Q5: Top 15 Product Segments by Profit Margin
--- Use case: Merchandising, private label strategy
--- Note: Uses aggregate-level filter to work at any scale factor.
+-- Uses NTILE-based volume filter so thresholds adapt to any SF
 -- ============================================================================
 WITH ranked AS (
     SELECT
@@ -116,9 +112,8 @@ ORDER BY profit_margin_pct DESC
 LIMIT 15;
 
 -- ============================================================================
--- Q6: Worst Performing Products — High return rate or low margin
--- Use case: Assortment rationalization
--- Note: Thresholds use percentile-based cutoffs to work at any scale factor.
+-- Q6: Worst Performing Products — high return rate or low margin
+-- Percentile-based cutoffs so it adapts to any SF
 -- ============================================================================
 WITH stats AS (
     SELECT
@@ -144,7 +139,7 @@ LIMIT 20;
 
 -- ============================================================================
 -- Q7: Supplier Reliability Ranking
--- Use case: Procurement negotiations, supplier tiering
+-- Procurement / supplier tiering
 -- ============================================================================
 SELECT
     supplier_name,
@@ -171,7 +166,7 @@ LIMIT 25;
 
 -- ============================================================================
 -- Q8: Shipping Mode Comparison
--- Use case: Logistics optimization, carrier negotiations
+-- Logistics / carrier negotiations
 -- ============================================================================
 SELECT
     ship_mode,
@@ -185,8 +180,8 @@ GROUP BY ship_mode
 ORDER BY total_revenue DESC;
 
 -- ============================================================================
--- Q9: Executive Dashboard — QoQ Trend
--- Use case: Board meeting, investor reporting
+-- Q9: Executive Dashboard — QoQ trend
+-- Board / investor reporting
 -- ============================================================================
 SELECT
     year_quarter,
@@ -201,8 +196,8 @@ FROM gold_executive_summary
 ORDER BY year_quarter;
 
 -- ============================================================================
--- Q10: Seasonality Analysis — Best and worst months across all years
--- Use case: Inventory planning, promotional calendar
+-- Q10: Seasonality — best and worst months across all years
+-- Inventory planning / promo calendar
 -- ============================================================================
 WITH monthly_totals AS (
     SELECT
@@ -236,8 +231,8 @@ FROM month_avg
 ORDER BY month;
 
 -- ============================================================================
--- Q11: Customer Acquisition Cohort — Orders by first-order quarter
--- Use case: Cohort analysis for retention
+-- Q11: Customer Acquisition Cohort — orders by first-order quarter
+-- Cohort retention analysis
 -- ============================================================================
 WITH cohorts AS (
     SELECT
@@ -259,8 +254,8 @@ GROUP BY cohort_quarter
 ORDER BY cohort_quarter;
 
 -- ============================================================================
--- Q12: Market Basket Indicator — Top segment × region revenue concentration
--- Use case: Store format planning, assortment by region
+-- Q12: Revenue Concentration — segment × region
+-- Store format planning / regional assortment
 -- ============================================================================
 SELECT
     segment,

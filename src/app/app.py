@@ -1,9 +1,4 @@
-"""
-Retail Analytics Dashboard — Databricks App
-
-Interactive Gradio application that queries Gold-layer Delta tables
-via the Databricks SDK statement execution API. No extra SQL driver needed.
-"""
+"""Retail Analytics Dashboard — Gradio app backed by Gold-layer Delta tables."""
 
 import os
 import logging
@@ -151,7 +146,7 @@ def executive_kpis():
 # ---------------------------------------------------------------------------
 with gr.Blocks(title="Retail Analytics", theme=gr.themes.Soft()) as app:
     gr.Markdown("# Retail Analytics Dashboard")
-    gr.Markdown("Powered by **Databricks Lakehouse** — Gold-layer Delta tables")
+    gr.Markdown("Gold-layer Delta tables · Databricks SQL")
 
     with gr.Tab("Customer 360"):
         gr.Markdown("### Look up any customer by ID")
