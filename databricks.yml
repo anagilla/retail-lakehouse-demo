@@ -14,6 +14,9 @@ variables:
   scale_factor:
     description: TPC-H scale factor (1 = 1GB, 10 = 10GB, 100 = 100GB)
     default: "1"
+  service_principal_name:
+    description: Service principal application ID for prod deployments
+    default: ""
 
 workspace:
   root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
@@ -139,17 +142,11 @@ targets:
   dev:
     mode: development
     default: true
-    workspace:
-      host: ${var.DATABRICKS_HOST}
-
-  staging:
-    mode: development
-    workspace:
-      host: ${var.DATABRICKS_HOST}
+    # Uses the host from your Databricks CLI profile.
+    # Override with: databricks bundle deploy -t dev --var="host=https://..."
 
   prod:
     mode: production
-    workspace:
-      host: ${var.DATABRICKS_HOST}
     run_as:
-      service_principal_name: ${var.SP_NAME}
+      # Set via: --var="service_principal_name=<sp-application-id>"
+      service_principal_name: ${var.service_principal_name}

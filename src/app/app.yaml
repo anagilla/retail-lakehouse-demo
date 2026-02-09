@@ -2,7 +2,7 @@ command:
   - python
   - app.py
 env:
+  - name: DATABRICKS_WAREHOUSE_ID
+    valueFrom: sql-warehouse
   - name: CATALOG
     description: Unity Catalog catalog name
-  - name: DATABRICKS_WAREHOUSE_ID
-    description: SQL Warehouse ID for query execution

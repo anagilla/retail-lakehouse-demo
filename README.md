@@ -93,7 +93,7 @@ retail-lakehouse-demo/
 - Databricks workspace with Unity Catalog enabled
 - Serverless compute (all notebooks are serverless-compatible)
 - A SQL Warehouse (Pro or Serverless) for Genie and the app
-- Databricks CLI v0.218+ (`pip install databricks-cli`)
+- Databricks CLI v0.218+ ([install instructions](https://docs.databricks.com/en/dev-tools/cli/install.html))
 
 ---
 
@@ -102,7 +102,7 @@ retail-lakehouse-demo/
 ### Deploy with Asset Bundles
 
 ```bash
-git clone <repo-url> && cd retail-lakehouse-demo
+git clone https://github.com/anagilla/retail-lakehouse-demo.git && cd retail-lakehouse-demo
 
 databricks configure --profile retail-demo
 databricks bundle validate -t dev
@@ -141,7 +141,7 @@ Schemas created:
 
 | Schema | Purpose |
 |---|---|
-| `retail_tpch` | Raw TPC-H tables |
+| `tpch` | Raw TPC-H tables |
 | `retail_bronze` | Bronze layer (raw + audit) |
 | `retail_silver` | Silver layer (dim/fact) |
 | `retail_gold` | Gold layer (aggregations) |
@@ -187,7 +187,7 @@ databricks bundle destroy -t dev
 
 Or drop schemas manually:
 ```sql
-DROP SCHEMA <catalog>.retail_tpch CASCADE;
+DROP SCHEMA <catalog>.tpch CASCADE;
 DROP SCHEMA <catalog>.retail_bronze CASCADE;
 DROP SCHEMA <catalog>.retail_silver CASCADE;
 DROP SCHEMA <catalog>.retail_gold CASCADE;
