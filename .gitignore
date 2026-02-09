@@ -1,0 +1,36 @@
+# Databricks
+.databricks/
+*.egg-info/
+dist/
+build/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg
+.eggs/
+*.whl
+.venv/
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Secrets / credentials — never commit these
+.env
+*.pem
+*.key
+credentials.json
+token.txt
+
+# Notebook checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log

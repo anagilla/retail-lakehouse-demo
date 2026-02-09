@@ -1,0 +1,155 @@
+# Databricks Asset Bundle configuration
+# See https://docs.databricks.com/dev-tools/bundles/index.html
+
+bundle:
+  name: retail-lakehouse-demo
+
+variables:
+  catalog:
+    description: Unity Catalog catalog name
+    default: ${workspace.current_user.short_name}_catalog
+  warehouse_id:
+    description: SQL Warehouse ID for queries and Genie
+    default: ""
+  scale_factor:
+    description: TPC-H scale factor (1 = 1GB, 10 = 10GB, 100 = 100GB)
+    default: "1"
+
+workspace:
+  root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+
+artifacts:
+  notebooks:
+    type: notebook
+    path: src/notebooks
+  sql:
+    type: file
+    path: src/sql
+  app:
+    type: file
+    path: src/app
+
+resources:
+  jobs:
+    # ── End-to-end pipeline: data generation through gold layer ──────────
+    retail_data_pipeline:
+      name: "[${bundle.target}] Retail Lakehouse — Data Pipeline"
+      description: >
+        Generates TPC-H data and builds the full Medallion Architecture
+        (Bronze → Silver → Gold) with Delta Lake tables.
+      tags:
+        project: retail-lakehouse-demo
+        owner: ${workspace.current_user.userName}
+      job_clusters:
+        - job_cluster_key: pipeline_cluster
+          new_cluster:
+            spark_version: "15.4.x-scala2.12"
+            num_workers: 2
+            node_type_id: i3.xlarge
+            data_security_mode: USER_ISOLATION
+      tasks:
+        - task_key: generate_tpch_data
+          description: Generate TPC-H benchmark data using pure PySpark
+          notebook_task:
+            notebook_path: src/notebooks/00_generate_data.ipynb
+          job_cluster_key: pipeline_cluster
+
+        - task_key: bronze_layer
+          depends_on:
+            - task_key: generate_tpch_data
+          description: Ingest raw data into Bronze layer with audit columns
+          notebook_task:
+            notebook_path: src/notebooks/01_bronze_layer.ipynb
+          job_cluster_key: pipeline_cluster
+
+        - task_key: silver_layer
+          depends_on:
+            - task_key: bronze_layer
+          description: Cleanse and enrich data into Silver dimension/fact tables
+          notebook_task:
+            notebook_path: src/notebooks/02_silver_layer.ipynb
+          job_cluster_key: pipeline_cluster
+
+        - task_key: gold_layer
+          depends_on:
+            - task_key: silver_layer
+          description: Build business-ready Gold aggregation tables
+          notebook_task:
+            notebook_path: src/notebooks/03_gold_layer.ipynb
+          job_cluster_key: pipeline_cluster
+
+    # ── AI/ML pipeline ───────────────────────────────────────────────────
+    retail_ml_pipeline:
+      name: "[${bundle.target}] Retail Lakehouse — AI/ML Models"
+      description: >
+        Trains churn prediction and demand forecasting models
+        on top of the Gold layer using scikit-learn and Prophet.
+      tags:
+        project: retail-lakehouse-demo
+        owner: ${workspace.current_user.userName}
+      tasks:
+        - task_key: train_models
+          description: Train customer churn + demand forecasting models
+          notebook_task:
+            notebook_path: src/notebooks/06_ai_ml_models.ipynb
+
+    # ── Serving layer setup ──────────────────────────────────────────────
+    retail_serving_setup:
+      name: "[${bundle.target}] Retail Lakehouse — Serving Layer"
+      description: >
+        Pushes Gold tables to Lakebase for low-latency serving,
+        registers features in Feature Store, and sets up Vector Search.
+      tags:
+        project: retail-lakehouse-demo
+        owner: ${workspace.current_user.userName}
+      tasks:
+        - task_key: lakebase_and_features
+          description: Set up Lakebase, Feature Store, and Vector Search
+          notebook_task:
+            notebook_path: src/notebooks/05_lakebase_serving.ipynb
+
+    # ── AI Agent + Dashboard setup ───────────────────────────────────────
+    retail_ai_experiences:
+      name: "[${bundle.target}] Retail Lakehouse — AI Experiences"
+      description: >
+        Deploys the AI Agent (tool-calling LLM), AI/BI Dashboard,
+        Genie Space, and Gradio-based Databricks App.
+      tags:
+        project: retail-lakehouse-demo
+        owner: ${workspace.current_user.userName}
+      tasks:
+        - task_key: ai_agent
+          description: Create UC SQL tool functions and test the AI agent
+          notebook_task:
+            notebook_path: src/notebooks/07_ai_agents.ipynb
+
+        - task_key: ai_bi_dashboard
+          description: Create Lakeview dashboard and Genie Space
+          notebook_task:
+            notebook_path: src/notebooks/08_ai_bi_dashboard.ipynb
+
+        - task_key: databricks_app
+          description: Deploy the Gradio-based Databricks App
+          depends_on:
+            - task_key: ai_bi_dashboard
+          notebook_task:
+            notebook_path: src/notebooks/09_databricks_app.ipynb
+
+targets:
+  dev:
+    mode: development
+    default: true
+    workspace:
+      host: ${var.DATABRICKS_HOST}
+
+  staging:
+    mode: development
+    workspace:
+      host: ${var.DATABRICKS_HOST}
+
+  prod:
+    mode: production
+    workspace:
+      host: ${var.DATABRICKS_HOST}
+    run_as:
+      service_principal_name: ${var.SP_NAME}
