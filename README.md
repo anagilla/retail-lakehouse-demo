@@ -24,6 +24,10 @@ data engineering, ML, real-time serving, and user-facing applications.
 | BI | Lakeview dashboard, Genie Space for natural-language Q&A |
 | App | Gradio web app deployed as a Databricks App |
 
+### Databricks App -- Retail Analytics Dashboard
+
+![Retail Analytics Dashboard](docs/DatabricksApp.png)
+
 ---
 
 ## Architecture
