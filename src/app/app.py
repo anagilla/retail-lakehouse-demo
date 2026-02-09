@@ -2,7 +2,7 @@
 Retail Analytics Dashboard — Databricks App
 
 Interactive Gradio application that queries Gold-layer Delta tables
-via the Databricks SQL Connector.
+via the Databricks SDK statement execution API. No extra SQL driver needed.
 """
 
 import os
@@ -10,6 +10,7 @@ import logging
 
 import gradio as gr
 import pandas as pd
+from databricks.sdk import WorkspaceClient
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -20,26 +21,23 @@ logger = logging.getLogger(__name__)
 CATALOG = os.getenv("CATALOG", "main")
 GOLD = f"{CATALOG}.retail_gold"
 SILVER = f"{CATALOG}.retail_silver"
-
-
-def get_connection():
-    """Open a connection to the SQL Warehouse."""
-    from databricks import sql as dbsql
-    return dbsql.connect(
-        server_hostname=os.getenv("DATABRICKS_HOST", "").replace("https://", ""),
-        http_path=os.getenv("DATABRICKS_SQL_WAREHOUSE_HTTP_PATH", ""),
-        access_token=os.getenv("DATABRICKS_TOKEN", ""),
-    )
+WAREHOUSE_ID = os.getenv("DATABRICKS_WAREHOUSE_ID", "")
 
 
 def run_query(sql: str) -> pd.DataFrame:
-    """Execute SQL and return a DataFrame."""
+    """Execute SQL via Databricks SDK (uses app service principal auth)."""
     try:
-        with get_connection() as conn:
-            with conn.cursor() as cursor:
-                cursor.execute(sql)
-                columns = [desc[0] for desc in cursor.description]
-                return pd.DataFrame(cursor.fetchall(), columns=columns)
+        w = WorkspaceClient()
+        response = w.statement_execution.execute_statement(
+            warehouse_id=WAREHOUSE_ID,
+            statement=sql,
+            wait_timeout="30s",
+        )
+        if response.result and response.manifest:
+            columns = [col.name for col in response.manifest.schema.columns]
+            rows = response.result.data_array or []
+            return pd.DataFrame(rows, columns=columns)
+        return pd.DataFrame()
     except Exception as e:
         logger.error(f"Query failed: {e}")
         return pd.DataFrame({"error": [str(e)]})
@@ -79,9 +77,9 @@ def customer_lookup(customer_id: str):
     md += f"| Segment | {row['market_segment']} |\n"
     md += f"| Region | {row['region_name']} ({row['nation_name']}) |\n"
     md += f"| RFM Segment | {row['rfm_segment']} |\n"
-    md += f"| Lifetime Value | ${row['lifetime_value']:,.2f} |\n"
+    md += f"| Lifetime Value | ${float(row['lifetime_value']):,.2f} |\n"
     md += f"| Total Orders | {row['total_orders']} |\n"
-    md += f"| Avg Order Value | ${row['avg_order_value']:,.2f} |\n"
+    md += f"| Avg Order Value | ${float(row['avg_order_value']):,.2f} |\n"
     md += f"| Recency (days) | {row['recency_days']} |\n"
     return md, profile
 
@@ -112,7 +110,7 @@ def revenue_explorer(region: str, start_month: str, end_month: str):
     if "error" in df.columns:
         return f"Query error: {df['error'].iloc[0]}", df
 
-    total = df["net_revenue"].sum()
+    total = pd.to_numeric(df["net_revenue"], errors="coerce").sum()
     return f"**Total Revenue**: ${total:,.0f}  |  **Rows**: {len(df)}", df
 
 
@@ -151,59 +149,54 @@ def executive_kpis():
 # ---------------------------------------------------------------------------
 # Gradio UI
 # ---------------------------------------------------------------------------
-def build_app():
-    with gr.Blocks(title="Retail Analytics", theme=gr.themes.Soft()) as demo:
-        gr.Markdown("# Retail Analytics Dashboard")
-        gr.Markdown("Powered by **Databricks Lakehouse** — Gold-layer Delta tables")
+with gr.Blocks(title="Retail Analytics", theme=gr.themes.Soft()) as app:
+    gr.Markdown("# Retail Analytics Dashboard")
+    gr.Markdown("Powered by **Databricks Lakehouse** — Gold-layer Delta tables")
 
-        with gr.Tab("Customer 360"):
-            gr.Markdown("### Look up any customer by ID")
-            with gr.Row():
-                cust_input = gr.Textbox(label="Customer ID", placeholder="e.g. 42", scale=1)
-                cust_btn = gr.Button("Look Up", variant="primary", scale=1)
-            cust_md = gr.Markdown()
-            cust_table = gr.Dataframe(label="Raw Profile")
-            cust_btn.click(customer_lookup, inputs=cust_input, outputs=[cust_md, cust_table])
+    with gr.Tab("Customer 360"):
+        gr.Markdown("### Look up any customer by ID")
+        with gr.Row():
+            cust_input = gr.Textbox(label="Customer ID", placeholder="e.g. 42", scale=1)
+            cust_btn = gr.Button("Look Up", variant="primary", scale=1)
+        cust_md = gr.Markdown()
+        cust_table = gr.Dataframe(label="Raw Profile")
+        cust_btn.click(customer_lookup, inputs=cust_input, outputs=[cust_md, cust_table])
 
-        with gr.Tab("Revenue Explorer"):
-            gr.Markdown("### Monthly revenue by region")
-            with gr.Row():
-                region_dd = gr.Dropdown(
-                    choices=["ALL", "AMERICA", "EUROPE", "ASIA", "AFRICA", "MIDDLE EAST"],
-                    value="ALL", label="Region",
-                )
-                start_m = gr.Textbox(label="Start (yyyy-MM)", value="1995-01")
-                end_m = gr.Textbox(label="End (yyyy-MM)", value="1997-12")
-                rev_btn = gr.Button("Query", variant="primary")
-            rev_summary = gr.Markdown()
-            rev_table = gr.Dataframe(label="Revenue Data")
-            rev_btn.click(revenue_explorer, inputs=[region_dd, start_m, end_m], outputs=[rev_summary, rev_table])
+    with gr.Tab("Revenue Explorer"):
+        gr.Markdown("### Monthly revenue by region")
+        with gr.Row():
+            region_dd = gr.Dropdown(
+                choices=["ALL", "AMERICA", "EUROPE", "ASIA", "AFRICA", "MIDDLE EAST"],
+                value="ALL", label="Region",
+            )
+            start_m = gr.Textbox(label="Start (yyyy-MM)", value="1995-01")
+            end_m = gr.Textbox(label="End (yyyy-MM)", value="1997-12")
+            rev_btn = gr.Button("Query", variant="primary")
+        rev_summary = gr.Markdown()
+        rev_table = gr.Dataframe(label="Revenue Data")
+        rev_btn.click(revenue_explorer, inputs=[region_dd, start_m, end_m], outputs=[rev_summary, rev_table])
 
-        with gr.Tab("Product Analytics"):
-            gr.Markdown("### Product performance by brand")
-            with gr.Row():
-                sort_dd = gr.Dropdown(
-                    choices=["net_revenue", "margin_pct", "return_rate_pct", "orders"],
-                    value="net_revenue", label="Sort By",
-                )
-                topn_slider = gr.Slider(minimum=5, maximum=50, value=20, step=5, label="Top N")
-                prod_btn = gr.Button("Query", variant="primary")
-            prod_table = gr.Dataframe(label="Product Performance")
-            prod_btn.click(product_analytics, inputs=[sort_dd, topn_slider], outputs=prod_table)
+    with gr.Tab("Product Analytics"):
+        gr.Markdown("### Product performance by brand")
+        with gr.Row():
+            sort_dd = gr.Dropdown(
+                choices=["net_revenue", "margin_pct", "return_rate_pct", "orders"],
+                value="net_revenue", label="Sort By",
+            )
+            topn_slider = gr.Slider(minimum=5, maximum=50, value=20, step=5, label="Top N")
+            prod_btn = gr.Button("Query", variant="primary")
+        prod_table = gr.Dataframe(label="Product Performance")
+        prod_btn.click(product_analytics, inputs=[sort_dd, topn_slider], outputs=prod_table)
 
-        with gr.Tab("Executive KPIs"):
-            gr.Markdown("### Quarterly executive summary")
-            exec_btn = gr.Button("Load KPIs", variant="primary")
-            exec_table = gr.Dataframe(label="Quarterly KPIs")
-            exec_btn.click(executive_kpis, outputs=exec_table)
-
-    return demo
-
+    with gr.Tab("Executive KPIs"):
+        gr.Markdown("### Quarterly executive summary")
+        exec_btn = gr.Button("Load KPIs", variant="primary")
+        exec_table = gr.Dataframe(label="Quarterly KPIs")
+        exec_btn.click(executive_kpis, outputs=exec_table)
 
 if __name__ == "__main__":
-    logger.info(f"Starting Retail Analytics App (catalog={CATALOG})")
-    demo = build_app()
-    demo.launch(
+    logger.info(f"Starting Retail Analytics App (catalog={CATALOG}, warehouse={WAREHOUSE_ID})")
+    app.launch(
         server_name="0.0.0.0",
         server_port=int(os.getenv("PORT", "8000")),
     )
