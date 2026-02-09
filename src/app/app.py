@@ -1,6 +1,7 @@
 """Retail Analytics Dashboard -- Gradio app backed by Gold-layer Delta tables."""
 
 import os
+import re
 import logging
 
 import gradio as gr
@@ -86,15 +87,31 @@ def customer_lookup(customer_id):
 
 
 # -- Tab: Revenue ------------------------------------------------------------------
+_VALID_REGIONS = {"AMERICA", "EUROPE", "ASIA", "AFRICA", "MIDDLE EAST"}
+_MONTH_RE = re.compile(r"^\d{4}-\d{2}$")
+
+
+def _sanitize_month(val: str | None) -> str | None:
+    """Return the value only if it matches YYYY-MM format."""
+    if val and _MONTH_RE.match(val.strip()):
+        return val.strip()
+    return None
+
+
 def revenue_data(region, start_month, end_month):
     """Monthly revenue by region with optional filters."""
     clauses = []
     if region and region != "ALL":
-        clauses.append(f"region = '{region}'")
-    if start_month:
-        clauses.append(f"year_month >= '{start_month}'")
-    if end_month:
-        clauses.append(f"year_month <= '{end_month}'")
+        if region in _VALID_REGIONS:
+            clauses.append(f"region = '{region}'")
+        else:
+            return "Invalid region selected.", pd.DataFrame()
+    safe_start = _sanitize_month(start_month)
+    safe_end = _sanitize_month(end_month)
+    if safe_start:
+        clauses.append(f"year_month >= '{safe_start}'")
+    if safe_end:
+        clauses.append(f"year_month <= '{safe_end}'")
     where = "WHERE " + " AND ".join(clauses) if clauses else ""
 
     df = run_query(f"""
@@ -116,8 +133,13 @@ def revenue_data(region, start_month, end_month):
 
 
 # -- Tab: Products -----------------------------------------------------------------
+_VALID_SORT_COLS = {"revenue", "margin_pct", "return_rate", "orders"}
+
+
 def product_data(sort_by, top_n):
     """Top products by brand and price band."""
+    col = sort_by if sort_by in _VALID_SORT_COLS else "revenue"
+    limit = max(5, min(int(top_n), 50))
     return run_query(f"""
         SELECT brand, price_band,
                ROUND(SUM(net_revenue), 0) AS revenue,
@@ -125,7 +147,7 @@ def product_data(sort_by, top_n):
                ROUND(AVG(return_rate_pct), 1) AS return_rate,
                SUM(num_orders) AS orders
         FROM {GOLD}.gold_product_performance
-        GROUP BY brand, price_band ORDER BY {sort_by} DESC LIMIT {int(top_n)}
+        GROUP BY brand, price_band ORDER BY {col} DESC LIMIT {limit}
     """)
 
 
