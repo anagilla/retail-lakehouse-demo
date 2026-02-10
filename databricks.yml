@@ -31,8 +31,35 @@ artifacts:
   app:
     type: file
     path: src/app
+  pipelines_sql:
+    type: file
+    path: pipelines
 
 resources:
+  # ── Lakeflow pipeline: Silver → Gold ──────────────────────────────────
+  pipelines:
+    retail_silver_to_gold:
+      name: "[${bundle.target}] Retail Lakehouse — Silver to Gold"
+      catalog: ${var.catalog}
+      target: retail_gold
+      libraries:
+        - file:
+            path: pipelines/silver_to_gold/gold_daily_sales.sql
+        - file:
+            path: pipelines/silver_to_gold/gold_monthly_sales.sql
+        - file:
+            path: pipelines/silver_to_gold/gold_executive_summary.sql
+        - file:
+            path: pipelines/silver_to_gold/gold_product_performance.sql
+        - file:
+            path: pipelines/silver_to_gold/gold_customer_rfm.sql
+        - file:
+            path: pipelines/silver_to_gold/gold_shipping_analysis.sql
+        - file:
+            path: pipelines/silver_to_gold/gold_supplier_scorecard.sql
+      development: true
+      photon: true
+
   jobs:
     # ── End-to-end pipeline: data generation through gold layer ──────────
     retail_data_pipeline:

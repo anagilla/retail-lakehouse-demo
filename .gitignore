@@ -14,13 +14,19 @@ __pycache__/
 venv/
 env/
 
-# IDE
+# IDE / Cursor / AI Dev Kit
 .idea/
 .vscode/
+.cursor/
+.ai-dev-kit/
+.github/skills/
 *.swp
 *.swo
 *~
 .DS_Store
+
+# AI Dev Kit workspace resource tracking
+.databricks-resources.json
 
 # Secrets / credentials — never commit these
 .env

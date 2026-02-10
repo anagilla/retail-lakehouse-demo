@@ -17,11 +17,14 @@ data engineering, ML, real-time serving, and user-facing applications.
 |---|---|
 | Data generation | Synthetic TPC-H data (1 GB to 100 GB), pure PySpark |
 | Medallion pipeline | Bronze → Silver → Gold with Delta Lake, liquid clustering, quality constraints |
+| Lakeflow pipeline | Silver → Gold via Spark Declarative Pipeline (7 materialized views) |
 | SQL analytics | 12 production-ready queries on Gold tables (window functions, CTEs, pivots) |
+| Document AI | Parse invoice/catalog PDFs with `ai_parse_document`, extract fields with `ai_extract` |
 | ML models | Customer churn prediction + demand forecasting, logged to MLflow |
 | Online serving | Lakebase (PostgreSQL), Feature Store, Vector Search |
 | AI agent | Tool-calling LLM backed by UC SQL functions |
-| BI | Lakeview dashboard, Genie Space for natural-language Q&A |
+| Knowledge Assistant | Q&A over invoice and product catalog PDFs (RAG) |
+| BI | Lakeview dashboard, Genie Space for self-serve analytics |
 | App | Gradio web app deployed as a Databricks App |
 
 ### Databricks App -- Retail Analytics Dashboard
@@ -40,8 +43,9 @@ data engineering, ML, real-time serving, and user-facing applications.
                                 │
 ┌───────────────────────────────▼─────────────────────────────────────────┐
 │                     MEDALLION ARCHITECTURE                              │
-│  01_bronze_layer  →  02_silver_layer  →  03_gold_layer                  │
-│  (raw + audit)       (dim/fact, SCD)     (KPIs, RFM, scorecards)        │
+│  01_bronze  →  02_silver  →  03_gold  (notebooks)                       │
+│                                ↕                                        │
+│  Lakeflow SDP:  silver_to_gold (7 materialized views)                   │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
           ┌─────────────────────┼──────────────────────┐
@@ -54,8 +58,11 @@ data engineering, ML, real-time serving, and user-facing applications.
 └─────────┬──────────┘ └────────┬───────┘ └──────────────────────┘
           │                     │
 ┌─────────▼─────────────────────▼────────────────────────────────┐
+│  Document AI        ai_parse_document / ai_extract             │
+│  Knowledge Asst.    Genie Space (Gold tables)                  │
+├────────────────────────────────────────────────────────────────┤
 │  07  AI AGENT         08  DASHBOARD          09  APP           │
-│  6 UC SQL tools       Lakeview + Genie       Gradio web app    │
+│  6 UC SQL tools       Lakeview dashboard     Gradio web app    │
 │  Llama 3.3 70B        Self-serve Q&A         Customer 360      │
 └────────────────────────────────────────────────────────────────┘
 ```
@@ -66,11 +73,20 @@ data engineering, ML, real-time serving, and user-facing applications.
 
 ```
 retail-lakehouse-demo/
-├── databricks.yml               # Asset Bundle config (jobs, targets)
+├── databricks.yml               # Asset Bundle config (jobs, pipelines, targets)
 ├── README.md
 ├── CONTRIBUTING.md
 ├── CHANGELOG.md
 ├── .gitignore
+├── pipelines/
+│   └── silver_to_gold/          # Lakeflow SDP pipeline (SQL materialized views)
+│       ├── gold_daily_sales.sql
+│       ├── gold_monthly_sales.sql
+│       ├── gold_executive_summary.sql
+│       ├── gold_product_performance.sql
+│       ├── gold_customer_rfm.sql
+│       ├── gold_shipping_analysis.sql
+│       └── gold_supplier_scorecard.sql
 └── src/
     ├── notebooks/
     │   ├── 00_generate_data.ipynb       # TPC-H data gen (pure PySpark)
@@ -113,7 +129,8 @@ databricks bundle validate -t dev
 databricks bundle deploy -t dev
 
 # Run pipelines in order
-databricks bundle run retail_data_pipeline -t dev
+databricks bundle run retail_data_pipeline -t dev          # generate + bronze + silver + gold
+databricks bundle run retail_silver_to_gold -t dev         # Lakeflow SDP (7 materialized views)
 databricks bundle run retail_ml_pipeline -t dev
 databricks bundle run retail_ai_experiences -t dev
 ```
@@ -173,13 +190,58 @@ Before running:
 
 ---
 
-## Genie Space setup
+## Lakeflow pipeline (Silver → Gold)
 
-Notebook 08 prints full instructions for manual Genie setup (~2 minutes):
+`pipelines/silver_to_gold/` has 7 SQL materialized views that aggregate the
+Silver fact/dimension tables into the Gold layer. Runs as a serverless Spark
+Declarative Pipeline.
 
-1. **AI/BI > Genie Spaces > New Space**
-2. Add the 8 Gold tables listed in the notebook output
-3. Paste the curated instructions and sample questions
+| View | Description |
+|---|---|
+| `gold_daily_sales` | Revenue, orders, margin by date / region / segment |
+| `gold_monthly_sales` | Rolls up daily sales; adds MoM and YoY growth |
+| `gold_executive_summary` | Quarterly KPIs for leadership (orders, customers, revenue) |
+| `gold_product_performance` | Brand-level revenue, margin, return rate |
+| `gold_customer_rfm` | RFM segmentation (recency / frequency / monetary quintiles) |
+| `gold_shipping_analysis` | On-time rate and delays per ship mode and region |
+| `gold_supplier_scorecard` | Delivery, quality, and profitability per supplier |
+
+```bash
+databricks bundle run retail_silver_to_gold -t dev
+```
+
+---
+
+## Document AI
+
+A set of retail invoice and product catalog PDFs live in the
+`retail_gold.gold_documentation` volume. You can parse them with
+`ai_parse_document` and pull structured fields out with `ai_extract`:
+
+```sql
+-- read PDFs as binary, parse to text
+SELECT path, ai_parse_document(content) AS parsed
+FROM READ_FILES('/Volumes/<catalog>/retail_gold/gold_documentation/*.pdf',
+               format => 'binaryFile');
+
+-- extract invoice fields from the parsed text
+SELECT ai_extract(full_text,
+         array('invoice_number', 'customer_name', 'total_amount'))
+FROM <catalog>.retail_gold.parsed_documents;
+```
+
+A Knowledge Assistant is also set up over these PDFs for Q&A.
+
+---
+
+## Genie Space
+
+A Genie Space ("Retail Sales Analytics") sits on top of the Gold tables.
+Try questions like:
+
+- "Total sales by region last quarter?"
+- "Which brands have the highest margins?"
+- "Top 10 suppliers by on-time delivery"
 
 ---
 
