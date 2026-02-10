@@ -35,23 +35,23 @@ data engineering, ML, real-time serving, and user-facing applications.
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
 │                        DATA GENERATION                                  │
-│  00_generate_data  →  TPC-H benchmark (1 GB → 100 GB, pure PySpark)   │
+│  00_generate_data  →  TPC-H benchmark (1 GB → 100 GB, pure PySpark)     │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
 ┌───────────────────────────────▼─────────────────────────────────────────┐
 │                     MEDALLION ARCHITECTURE                              │
-│  01_bronze_layer  →  02_silver_layer  →  03_gold_layer                 │
-│  (raw + audit)       (dim/fact, SCD)     (KPIs, RFM, scorecards)       │
+│  01_bronze_layer  →  02_silver_layer  →  03_gold_layer                  │
+│  (raw + audit)       (dim/fact, SCD)     (KPIs, RFM, scorecards)        │
 └───────────────────────────────┬─────────────────────────────────────────┘
                                 │
           ┌─────────────────────┼──────────────────────┐
           │                     │                      │
-┌─────────▼──────────┐ ┌───────▼────────┐ ┌───────────▼──────────┐
+┌─────────▼──────────┐ ┌────────▼───────┐ ┌───────────▼──────────┐
 │  05  LAKEBASE      │ │  06  AI / ML   │ │  04  SQL ANALYTICS   │
 │  Online serving    │ │  Churn model   │ │  12 analytical       │
 │  Feature Store     │ │  Demand        │ │  queries on Gold     │
 │  Vector Search     │ │  forecasting   │ │                      │
-└─────────┬──────────┘ └───────┬────────┘ └──────────────────────┘
+└─────────┬──────────┘ └────────┬───────┘ └──────────────────────┘
           │                     │
 ┌─────────▼─────────────────────▼────────────────────────────────┐
 │  07  AI AGENT         08  DASHBOARD          09  APP           │
